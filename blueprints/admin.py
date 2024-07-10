@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 from extends import db
 from models import Station, User
 from predict import predict_demand
-
+from run import main
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 json_data_list = []
 
@@ -103,13 +103,24 @@ def dispatch():
     try:
         # 获取请求中的 JSON 数据
         data = request.get_json()
-        if not data or 'num' not in data:
-            return jsonify({"error": "Invalid input data"}), 400
+        num = data.get('num')
 
-        num = data['num']
+        if num is None:
+            return jsonify({"error": "Missing 'num' parameter"}), 400
 
-        # todo
-        # 调用调度算法获取n个数据,存到json_data_list中
+        try:
+            num = int(num)
+        except ValueError:
+            return jsonify({"error": "'num' parameter must be an integer"}), 400
+
+        if num <= 0:
+            return jsonify({"error": "'num' parameter must be a positive integer"}), 400
+
+        # 调用调度算法获取 n 个数据, 存到 json_data_list 中
+        json_data_list = main(num)
+
+        if not isinstance(json_data_list, list):
+            return jsonify({"error": "'main' function must return a list"}), 500
 
         # 查询数据库获取 role 为 'dispatcher' 的前 num 个用户
         dispatchers = User.query.filter_by(role='dispatcher').limit(num).all()
@@ -118,7 +129,7 @@ def dispatch():
         dispatcher_ids = [dispatcher.id for dispatcher in dispatchers]
 
         # 提取 json_data_list 中所有 station_id
-        station_ids = [member['station_id'] for member in json_data_list]
+        station_ids = [member.get('station_id') for member in json_data_list if 'station_id' in member]
 
         # 查询数据库获取所有 station_id 对应的经纬度
         stations = Station.query.filter(Station.station_id.in_(station_ids)).all()
@@ -127,8 +138,8 @@ def dispatch():
         # 将 dispatcher_ids 和经纬度信息插入到 json_data_list 中每个成员的相应字段
         for member in json_data_list:
             member['dispatcher_id'] = dispatcher_ids
-            station_id = member['station_id']
-            if station_id in station_dict:
+            station_id = member.get('station_id')
+            if station_id and station_id in station_dict:
                 member['station_lat'], member['station_lng'] = station_dict[station_id]
             else:
                 member['station_lat'], member['station_lng'] = None, None  # 或者处理未找到的情况

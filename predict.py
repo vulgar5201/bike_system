@@ -129,7 +129,7 @@ def predict_demand(hour, day_of_week, is_holiday, station_id, T, U, Ff):
     return int(predicted_demand[0][0])
 
 
-# 使用方法示例
-predict_demand_from_db(is_holiday=0)
-result = predict_demand(hour=8, day_of_week=3, is_holiday=0, station_id='TA1307000126', T=25.0, U=50.0, Ff=5.0)
-print(f'Predicted demand for specific input: {result}')
+# # 使用方法示例
+# predict_demand_from_db(is_holiday=0)
+# result = predict_demand(hour=8, day_of_week=3, is_holiday=0, station_id='TA1307000126', T=25.0, U=50.0, Ff=5.0)
+# print(f'Predicted demand for specific input: {result}')
