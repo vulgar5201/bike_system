@@ -30,17 +30,17 @@ def register():
     role = data.get('role')
     captcha = data.get('captcha')
 
-    # 检查必填字段
-    if not all([username, password, email, confirm_password, role]):
-        return jsonify({'message': '所有字段都是必填的'}), 400
-
-    # 检查密码长度
-    if len(password) < MIN_PASSWORD_LENGTH:
-        return jsonify({'message': '密码长度不能少于6位'}), 401
-
-    # 检查密码是否一致
-    if password != confirm_password:
-        return jsonify({'message': '密码不一致，请重新输入'}), 402
+    # # 检查必填字段
+    # if not all([username, password, email, confirm_password, role]):
+    #     return jsonify({'message': '所有字段都是必填的'}), 400
+    #
+    # # 检查密码长度
+    # if len(password) < MIN_PASSWORD_LENGTH:
+    #     return jsonify({'message': '密码长度不能少于6位'}), 401
+    #
+    # # 检查密码是否一致
+    # if password != confirm_password:
+    #     return jsonify({'message': '密码不一致，请重新输入'}), 402
 
     # 检查用户名、手机号和邮箱是否已经存在
     if User.query.filter_by(username=username).first():

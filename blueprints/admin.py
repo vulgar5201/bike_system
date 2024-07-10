@@ -1,10 +1,11 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from extends import db
-from models import Station
+from models import Station, User
 from predict import predict_demand
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
+json_data_list = []
 
 
 # 查看站点接口
@@ -51,24 +52,100 @@ def change():
 
 @bp.route('/predict', methods=['POST'])
 def predict():
-    data = request.get_json()
-    hour = data.get('time')
-    date_str = data.get('date')
-    day_of_week = -1
     try:
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
-        day_of_week = date_obj.weekday()
-    except ValueError:
-        # 如果日期字符串格式不正确，将捕获 ValueError 异常
-        print("无效的日期格式")
-    is_holiday = data.get('is_holiday')
-    station_id = data.get('station_id')
-    T = data.get('temperature')
-    U = data.get('humidity')
-    Ff = data.get('windSpeed')
-    station = Station.query.get(data.get('station_id'))
+        # 获取并验证请求中的 JSON 数据
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid input data"}), 400
 
-    print(T, U, Ff)
-    station.bike_demand = predict_demand(hour, day_of_week, is_holiday, station_id, T, U, Ff)
-    db.session.add(station)
-    db.session().commit()
+        hour = data.get('time')
+        date_str = data.get('date')
+        is_holiday = data.get('is_holiday')
+        station_id = data.get('station_id')
+        T = data.get('temperature')
+        U = data.get('humidity')
+        Ff = data.get('windSpeed')
+
+        # 验证必需字段是否存在
+        if any(v is None for v in [hour, date_str, is_holiday, station_id, T, U, Ff]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # 解析日期并获取星期几
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+            day_of_week = date_obj.weekday()
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD."}), 400
+
+        # 从数据库中查询站点信息
+        station = Station.query.get(station_id)
+        if not station:
+            return jsonify({"error": "Station not found"}), 404
+
+        # 调用预测函数
+        bike_demand = predict_demand(hour, day_of_week, is_holiday, station_id, T, U, Ff)
+
+        # 更新站点信息
+        station.bike_demand = bike_demand
+        db.session.add(station)
+        db.session.commit()
+
+        return jsonify({"message": "Prediction successful", "bike_demand": bike_demand})
+
+    except Exception as e:
+        # 捕获所有其他异常并返回错误信息
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+# 分配调度路线
+@bp.route('/dispatch', methods=['POST'])
+def dispatch():
+    try:
+        # 获取请求中的 JSON 数据
+        data = request.get_json()
+        if not data or 'num' not in data:
+            return jsonify({"error": "Invalid input data"}), 400
+
+        num = data['num']
+
+        # todo
+        # 调用调度算法获取n个数据,存到json_data_list中
+
+        # 查询数据库获取 role 为 'dispatcher' 的前 num 个用户
+        dispatchers = User.query.filter_by(role='dispatcher').limit(num).all()
+
+        # 提取用户 ID 并放入列表
+        dispatcher_ids = [dispatcher.id for dispatcher in dispatchers]
+
+        # 提取 json_data_list 中所有 station_id
+        station_ids = [member['station_id'] for member in json_data_list]
+
+        # 查询数据库获取所有 station_id 对应的经纬度
+        stations = Station.query.filter(Station.station_id.in_(station_ids)).all()
+        station_dict = {station.station_id: (station.station_lat, station.station_lng) for station in stations}
+
+        # 将 dispatcher_ids 和经纬度信息插入到 json_data_list 中每个成员的相应字段
+        for member in json_data_list:
+            member['dispatcher_id'] = dispatcher_ids
+            station_id = member['station_id']
+            if station_id in station_dict:
+                member['station_lat'], member['station_lng'] = station_dict[station_id]
+            else:
+                member['station_lat'], member['station_lng'] = None, None  # 或者处理未找到的情况
+
+        return jsonify(json_data_list)
+
+    except Exception as e:
+        # 捕获所有异常并返回错误信息
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+# 获得调度的数据
+@bp.route('/data_provider', methods=['GET'])
+def data_provider():
+    try:
+        # 返回 JSON 数据列表
+        return jsonify(json_data_list)
+    except Exception as e:
+        # 捕获所有异常并返回错误信息
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
