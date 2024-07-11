@@ -1,4 +1,4 @@
-import math
+import math, requests
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from config import create_db_engine, test_database_connection
@@ -80,7 +80,6 @@ def assign_dispatchers_and_transport(stations, dispatcher_count):
 
     return assignments, station_data
 
-
 # 主函数
 def main(dispatcher_count):
     # 创建数据库引擎并测试连接
@@ -96,15 +95,29 @@ def main(dispatcher_count):
     # 获取分配和运输结果
     assignments, station_data = assign_dispatchers_and_transport(stations, dispatcher_count)
 
-    # 输出分配和运输结果
     all_routes = []
     for dispatcher, info in assignments.items():
         from_station = info['from']
         routes = []
         for to_station in info['to']:
-            route = (from_station['station_id'], to_station['station_id'], to_station['bikes'])
+            route = {
+                "from_lat": from_station['latitude'],
+                "from_lon": from_station['longitude'],
+                "to_lat": to_station['to_lat'],
+                "to_lon": to_station['to_lon'],
+                "bikes": to_station['bikes']
+            }
             routes.append(route)
-            from_station = to_station
+            from_station = {
+                'latitude': to_station['to_lat'],
+                'longitude': to_station['to_lon']
+            }
         all_routes.append({dispatcher: routes})
+
+    print(all_routes)
+
     # 返回所有调度员的完整路线列表
     return all_routes
+
+if __name__ == '__main__':
+    main(5)
