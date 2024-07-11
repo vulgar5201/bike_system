@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, session
 import requests
 bp = Blueprint('dispatcher', __name__, url_prefix='/dispatcher')
 BASE_URL = 'http://localhost:5000'
@@ -8,11 +8,7 @@ BASE_URL = 'http://localhost:5000'
 def draw():
     try:
         # 从请求中获取 JSON 数据
-        data = request.get_json()
-        if not data or 'dispatcher_id' not in data:
-            return jsonify({"error": "Invalid input data"}), 400
-
-        dispatcher_id = data['dispatcher_id']
+        dispatcher_id = session.get('user_id')
         dispatcher_id_str = str(dispatcher_id)
         # 发送请求获取数据提供者的数据
         BASE_URL = 'http://127.0.0.1:5000'  # 替换为实际的数据提供者 URL
