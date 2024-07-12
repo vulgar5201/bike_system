@@ -1,6 +1,6 @@
 import random
 import string
-from flask import Blueprint, render_template, jsonify, redirect, url_for, flash, session
+from flask import Blueprint, jsonify, session
 from flask_mail import Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -143,6 +143,7 @@ def login_with_phone():
         return jsonify({'message': '该用户未注册，请先注册账户'}), 404
 
     if user and check_password_hash(user.password, password):
+        session['user_id'] = user.id
         return jsonify({
             'message': '登录成功',
             'user_id': user.id,

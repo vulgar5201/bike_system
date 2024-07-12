@@ -1,12 +1,26 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-from extends import db
 from models import Station, User
-from predict import predict_demand
 from run import main
-
+from extends import db
 bp = Blueprint('admin', __name__, url_prefix='/admin')
-json_data_list = []
+# dispatchers_list = []
+# result = []
+# [
+#     {
+#         'from_lat': float(station.station_lat),
+#         'from_lng': float(station.station_lng),
+#         'to_lat': float(station.station_lat),
+#         'to_lng': float(station.station_lng),
+#         dispatch_num:""
+#         'from_lat': float(station.station_lat),
+#         'from_lng': float(station.station_lng),
+#         'to_lat': float(station.station_lat),
+#         'to_lng': float(station.station_lng),
+#         dispatch_num: ""
+#     }
+#
+# ]
 
 
 # 查看站点接口
@@ -29,7 +43,6 @@ def check():
     return jsonify(stations_list)
 
 
-# 更新站点接口
 @bp.route('/update', methods=['POST'])
 def change():
     data = request.get_json()
@@ -44,6 +57,7 @@ def change():
     station.bike_number = data.get('bike_number')
     station.bike_demand = data.get('bike_demand')
     try:
+        # db.session.add(station)
         db.session.commit()
         return jsonify({"code": 200, "message": "Station updated successfully!"}), 200
     except Exception as e:
@@ -53,6 +67,7 @@ def change():
 
 @bp.route('/predict', methods=['POST'])
 def predict():
+    from predict import predict_demand
     try:
         # 获取并验证请求中的 JSON 数据
         data = request.get_json()
@@ -98,13 +113,10 @@ def predict():
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# 分配调度路线
-@bp.route('/dispatch', methods=['POST'])
+@bp.route('/dispatch', methods=['GET'])
 def dispatch():
     try:
-        # 获取请求中的 JSON 数据
-        data = request.get_json()
-        num = data.get('num')
+        num = User.query.filter_by(role='dispatcher').count()
 
         if num is None:
             return jsonify({"error": "Missing 'num' parameter"}), 400
@@ -114,91 +126,52 @@ def dispatch():
         except ValueError:
             return jsonify({"error": "'num' parameter must be an integer"}), 400
 
-        if num <= 0:
-            return jsonify({"error": "'num' parameter must be a positive integer"}), 400
-
         # 调用调度算法获取 n 个数据, 存到 json_data_list 中
-        json_data_list = main(num)
+        routes = main(num)
 
-        if not isinstance(json_data_list, list):
+        if not isinstance(routes, list):
             return jsonify({"error": "'main' function must return a list"}), 500
 
         # 查询数据库获取 role 为 'dispatcher' 的前 num 个用户
         dispatchers = User.query.filter_by(role='dispatcher').limit(num).all()
 
         # 提取用户 ID 并放入列表
-        dispatcher_ids = [dispatcher.id for dispatcher in dispatchers]
+        dispatchers_list = [dispatcher.id for dispatcher in dispatchers]
 
-        # 提取 json_data_list 中所有 station_id
-        station_ids = [member.get('station_id') for member in json_data_list if 'station_id' in member]
+        result = []  # 初始化result列表
 
-        # 查询数据库获取所有 station_id 对应的经纬度
-        stations = Station.query.filter(Station.station_id.in_(station_ids)).all()
-        station_dict = {station.station_id: (station.station_lat, station.station_lng) for station in stations}
+        for i, dispatcher_id in enumerate(dispatchers_list):
+            route = routes[i]
+            for key in route:
+                result.append({f"{dispatcher_id}": route[key]})
 
-        # 将 dispatcher_ids 和经纬度信息插入到 json_data_list 中每个成员的相应字段
-        for member in json_data_list:
-            member['dispatcher_id'] = dispatcher_ids
-            station_id = member.get('station_id')
-            if station_id and station_id in station_dict:
-                member['station_lat'], member['station_lng'] = station_dict[station_id]
-            else:
-                member['station_lat'], member['station_lng'] = None, None  # 或者处理未找到的情况
-
-        return jsonify(json_data_list)
+        return jsonify(result)
 
     except Exception as e:
         # 捕获所有异常并返回错误信息
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# 获得调度的数据
-@bp.route('/data_provider', methods=['GET'])
-def data_provider():
-    try:
-        # 返回 JSON 数据列表
-        return jsonify(json_data_list)
-    except Exception as e:
-        # 捕获所有异常并返回错误信息
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+# @bp.route('/data_provider', methods=['GET'])
+# def data_provider():
+#     try:
+#         # 返回 JSON 数据列表
+#         return jsonify(result)
+#     except Exception as e:
+#         # 捕获所有异常并返回错误信息
+#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# 修改身份接口
-@bp.route('/modify', methods=['POST'])
-def modify():
-    data = request.get_json()
-    id = data.get('id')
-    user = User.query.get(id)
-    if not user:
-        return jsonify({'status': 'error', 'msg': 'user not found'}), 404
-
-    new_role = data.get('role')
-    if new_role not in ['admin', 'dispatcher']:
-        return jsonify({'status': 'error', 'msg': 'Invalid role'}), 400
-
-    user.username = data.get('username')
-    user.role = new_role
-    try:
-        db.session.commit()
-        return jsonify({"code": 200, "message": "User modified successfully!"}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'status': 'error', 'msg': str(e)}), 500
+# @bp.route('/dispatcher_id_provider', methods=['GET'])
+# def dispatcher_id_provider():
+#     try:
+#         return jsonify(dispatchers_list)
+#     except Exception as e:
+#         # 捕获所有异常并返回错误信息
+#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# 删除用户接口
-@bp.route('/delete', methods=['POST'])
-def delete():
-    data = request.get_json()
-    id = data.get('id')
-    user = User.query.get(id)
-    if not user:
-        return jsonify({'status': 'error', 'msg': 'user not found'}), 404
 
-    try:
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({"code": 200, "message": "User deleted successfully!"}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'status': 'error', 'msg': str(e)}), 500
+
+
+
