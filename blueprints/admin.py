@@ -1,9 +1,13 @@
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from models import Station, User
 from run import main
 from extends import db
+from predict import predict_demand, predict_demand_from_db
+
 bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
 # dispatchers_list = []
 # result = []
 # [
@@ -113,6 +117,13 @@ def predict():
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
+@bp.route('/predict_implement', methods=['GET'])
+def predict_implement():
+    is_holiday = request.args.get('is_holiday', default=0, type=int)
+    result, status_code = predict_demand_from_db(is_holiday)
+    return jsonify(result), status_code
+
+
 @bp.route('/dispatch', methods=['GET'])
 def dispatch():
     try:
@@ -151,24 +162,6 @@ def dispatch():
         # 捕获所有异常并返回错误信息
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
-
-# @bp.route('/data_provider', methods=['GET'])
-# def data_provider():
-#     try:
-#         # 返回 JSON 数据列表
-#         return jsonify(result)
-#     except Exception as e:
-#         # 捕获所有异常并返回错误信息
-#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
-
-# @bp.route('/dispatcher_id_provider', methods=['GET'])
-# def dispatcher_id_provider():
-#     try:
-#         return jsonify(dispatchers_list)
-#     except Exception as e:
-#         # 捕获所有异常并返回错误信息
-#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 # 修改身份接口
 @bp.route('/modify', methods=['POST'])
@@ -210,7 +203,20 @@ def delete():
         db.session.rollback()
         return jsonify({'status': 'error', 'msg': str(e)}), 500
 
+# @bp.route('/data_provider', methods=['GET'])
+# def data_provider():
+#     try:
+#         # 返回 JSON 数据列表
+#         return jsonify(result)
+#     except Exception as e:
+#         # 捕获所有异常并返回错误信息
+#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-
-
+# @bp.route('/dispatcher_id_provider', methods=['GET'])
+# def dispatcher_id_provider():
+#     try:
+#         return jsonify(dispatchers_list)
+#     except Exception as e:
+#         # 捕获所有异常并返回错误信息
+#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
