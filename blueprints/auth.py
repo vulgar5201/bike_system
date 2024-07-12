@@ -8,8 +8,7 @@ from extends import mail, db
 from models import EmailCaptchaModel, User
 from flask import request
 from flask_cors import CORS
-
-
+from sqlalchemy.exc import SQLAlchemyError
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 CORS(bp)
 
@@ -151,3 +150,45 @@ def login_with_phone():
             'role': user.role
         }), 200
     return jsonify({'message': '密码错误，请重试'}), 401
+
+
+# 邮箱验证码修改密码
+@bp.route('/reset_password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.get_json()
+        password = data.get('password')
+        email = data.get('email')
+        captcha = data.get('verificationCode')
+
+        if not email or not password or not captcha:
+            return jsonify({'status': 'error', 'msg': '缺少必要的参数'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({'status': 'error', 'msg': '用户未找到'}), 404
+
+        # 检查邮箱验证码正确性
+        captcha_record = EmailCaptchaModel.query.filter_by(email=email, captcha=captcha).first()
+        if not captcha_record:
+            return jsonify({'status': 'error', 'msg': '验证码错误'}), 408
+
+        if datetime.utcnow() - captcha_record.timestamp > timedelta(minutes=2):
+            db.session.delete(captcha_record)
+            db.session.commit()
+            return jsonify({'status': 'error', 'msg': '验证码已失效'}), 408
+
+        # 验证成功，更新密码
+        hashed_password = generate_password_hash(password)
+        user.password = hashed_password
+        db.session.delete(captcha_record)  # 删除验证码记录
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'msg': '密码更新成功'}), 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': '数据库错误', 'error': str(e)}), 500
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'msg': '内部服务器错误', 'error': str(e)}), 500
