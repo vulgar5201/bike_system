@@ -4,7 +4,10 @@ from models import Station, User
 from run import main
 from extends import db
 from predict import predict_demand, predict_demand_from_db
+
 bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
 # dispatchers_list = []
 # result = []
 # [
@@ -217,9 +220,3 @@ def delete():
 #     except Exception as e:
 #         # 捕获所有异常并返回错误信息
 #         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
-
-
-
-
-

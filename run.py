@@ -80,6 +80,7 @@ def assign_dispatchers_and_transport(stations, dispatcher_count):
 
     return assignments, station_data
 
+
 # 主函数
 def main(dispatcher_count):
     # 创建数据库引擎并测试连接
@@ -118,6 +119,7 @@ def main(dispatcher_count):
 
     # 返回所有调度员的完整路线列表
     return all_routes
+
 
 if __name__ == '__main__':
     main(5)
