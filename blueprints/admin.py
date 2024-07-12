@@ -170,6 +170,45 @@ def dispatch():
 #         # 捕获所有异常并返回错误信息
 #         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
+# 修改身份接口
+@bp.route('/modify', methods=['POST'])
+def modify():
+    data = request.get_json()
+    id = data.get('id')
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'status': 'error', 'msg': 'user not found'}), 404
+
+    new_role = data.get('role')
+    if new_role not in ['admin', 'dispatcher']:
+        return jsonify({'status': 'error', 'msg': 'Invalid role'}), 400
+
+    user.username = data.get('username')
+    user.role = new_role
+    try:
+        db.session.commit()
+        return jsonify({"code": 200, "message": "User modified successfully!"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': str(e)}), 500
+
+
+# 删除用户接口
+@bp.route('/delete', methods=['POST'])
+def delete():
+    data = request.get_json()
+    id = data.get('id')
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'status': 'error', 'msg': 'user not found'}), 404
+
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"code": 200, "message": "User deleted successfully!"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': str(e)}), 500
 
 
 
